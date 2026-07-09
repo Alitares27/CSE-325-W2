@@ -19,18 +19,20 @@ namespace MvcMovie.Controllers
             _context = context;
         }
 
-        // GET: Movies
-        public async Task<IActionResult> Index(string movieGenre, string searchString)
+        public async Task<IActionResult> Index(string movieGenre, string searchString, int? movieYear)
         {
             if (_context.Movie == null)
             {
                 return Problem("Entity set 'MvcMovieContext.Movie'  is null.");
             }
 
-            // Use LINQ to get list of genres.
             IQueryable<string> genreQuery = from m in _context.Movie
                                             orderby m.Genre
                                             select m.Genre;
+
+            IQueryable<int> yearQuery = from m in _context.Movie
+                                        orderby m.ReleaseDate.Year descending
+                                        select m.ReleaseDate.Year;
 
             var movies = from m in _context.Movie
                          select m;
@@ -45,18 +47,26 @@ namespace MvcMovie.Controllers
                 movies = movies.Where(x => x.Genre == movieGenre);
             }
 
+            if (movieYear.HasValue)
+            {
+                movies = movies.Where(x => x.ReleaseDate.Year >= movieYear.Value);
+            }
+
+            var distinctYears = await yearQuery.Distinct().ToListAsync();
+
             var movieGenreVM = new MovieGenreViewModel
             {
                 Genres = new SelectList(await genreQuery.Distinct().ToListAsync(), movieGenre),
+                Years = new SelectList(distinctYears, movieYear),
                 Movies = await movies.ToListAsync(),
                 MovieGenre = movieGenre,
+                MovieYear = movieYear,
                 SearchString = searchString
             };
 
             return View(movieGenreVM);
         }
 
-        // GET: Movies/Details/5
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -74,15 +84,11 @@ namespace MvcMovie.Controllers
             return View(movie);
         }
 
-        // GET: Movies/Create
         public IActionResult Create()
         {
             return View();
         }
 
-        // POST: Movies/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("Id,Title,ReleaseDate,Genre,Price")] Movie movie)
@@ -96,7 +102,6 @@ namespace MvcMovie.Controllers
             return View(movie);
         }
 
-        // GET: Movies/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -112,9 +117,6 @@ namespace MvcMovie.Controllers
             return View(movie);
         }
 
-        // POST: Movies/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, [Bind("Id,Title,ReleaseDate,Genre,Price,Rating")] Movie movie)
@@ -147,7 +149,6 @@ namespace MvcMovie.Controllers
             return View(movie);
         }
 
-        // GET: Movies/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -165,7 +166,6 @@ namespace MvcMovie.Controllers
             return View(movie);
         }
 
-        // POST: Movies/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
